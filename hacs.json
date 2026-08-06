@@ -1,0 +1,6 @@
+{
+  "name": "Concierge MCP Server",
+  "render_readme": true,
+  "homeassistant": "2024.12.0",
+  "zip_release": false
+}

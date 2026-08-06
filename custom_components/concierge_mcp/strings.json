@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Concierge MCP",
+        "description": "This creates a second, independently-scoped MCP endpoint at `/api/concierge_mcp`, authenticated by its own secret. It cannot be used to reach any other Home Assistant API. You will choose which entities it exposes after setup, from the integration's options."
+      },
+      "show_secret": {
+        "title": "Your guest secret",
+        "description": "Give this secret to your MCP client. It is shown only once — if you lose it, generate a new one from the integration's options page.\n\n```\n{secret}\n```"
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Concierge MCP is already configured. Only one instance is supported."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Concierge MCP options",
+        "menu_options": {
+          "entities": "Manage exposed entities",
+          "regenerate_secret": "Regenerate guest secret"
+        }
+      },
+      "entities": {
+        "title": "Exposed entities",
+        "description": "Choose exactly which entities the guest chatbot can see. Anything not listed here is invisible to it, even if it exists elsewhere in Home Assistant.",
+        "data": {
+          "entities": "Entities to expose (read-only)",
+          "control": "Entities allowed to be controlled (reserved for a future release; has no effect yet)"
+        }
+      },
+      "regenerate_secret": {
+        "title": "Regenerate guest secret",
+        "description": "This immediately invalidates the old secret. Update your MCP client before confirming, or it will lose access.\n\n```\n{secret}\n```"
+      }
+    }
+  }
+}
