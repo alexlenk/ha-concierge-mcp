@@ -8,5 +8,5 @@ mcp>=1.9.0,<2.0.0
 # above resolves to — check that manifest during each upstream sync review
 # (design document, section 12.1) rather than assuming these stay correct.
 aiohttp_sse
-hassil==3.5.0
+hassil==3.11.0
 home-assistant-intents==2026.1.28
