@@ -1,0 +1,12 @@
+pytest-homeassistant-custom-component==0.13.316
+mcp>=1.9.0,<2.0.0
+
+# Pulled in only so tests can set up the official mcp_server integration
+# alongside this one, to prove FR-8 (no cross-integration interference).
+# Versions must track homeassistant.components.conversation's manifest.json
+# pins for the homeassistant version pytest-homeassistant-custom-component
+# above resolves to — check that manifest during each upstream sync review
+# (design document, section 12.1) rather than assuming these stay correct.
+aiohttp_sse
+hassil==3.5.0
+home-assistant-intents==2026.1.28
