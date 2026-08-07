@@ -88,3 +88,10 @@ pytest tests/ --cov=custom_components.concierge_mcp
 
 Tests run fully offline against `pytest-homeassistant-custom-component`
 — no live Home Assistant instance or network access required.
+
+## Project docs
+
+- [`docs/DESIGN.md`](docs/DESIGN.md) — the full requirements and design
+  document this integration was built from.
+- [`docs/STATUS.md`](docs/STATUS.md) — what's implemented vs. outstanding
+  against that design, and pointers to the open issues tracking the rest.
