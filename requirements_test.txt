@@ -9,4 +9,4 @@ mcp>=1.9.0,<2.0.0
 # (design document, section 12.1) rather than assuming these stay correct.
 aiohttp_sse
 hassil==3.5.0
-home-assistant-intents==2026.1.28
+home-assistant-intents==2026.7.30
