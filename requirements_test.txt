@@ -1,5 +1,5 @@
 pytest-homeassistant-custom-component==0.13.316
-mcp>=1.9.0,<2.0.0
+mcp>=2.0.0,<3.0.0
 
 # Pulled in only so tests can set up the official mcp_server integration
 # alongside this one, to prove FR-8 (no cross-integration interference).
