@@ -1,4 +1,4 @@
-pytest-homeassistant-custom-component==0.13.316
+pytest-homeassistant-custom-component==0.13.348
 mcp>=1.9.0,<2.0.0
 
 # Pulled in only so tests can set up the official mcp_server integration
@@ -7,6 +7,7 @@ mcp>=1.9.0,<2.0.0
 # pins for the homeassistant version pytest-homeassistant-custom-component
 # above resolves to — check that manifest during each upstream sync review
 # (design document, section 12.1) rather than assuming these stay correct.
+# Pinned to HA 2026.7.4's conversation/manifest.json (0.13.348 -> homeassistant==2026.7.4).
 aiohttp_sse
-hassil==3.5.0
-home-assistant-intents==2026.1.28
+hassil==3.8.0
+home-assistant-intents==2026.6.24
