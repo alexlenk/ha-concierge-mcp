@@ -7,6 +7,7 @@ and two integrations set up in the same instance don't interfere.
 """
 from __future__ import annotations
 
+from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.concierge_mcp.const import API_URL, DOMAIN
@@ -192,6 +193,13 @@ async def test_cross_integration_isolation_with_official_mcp_server(
     secret, or entity exposure leaks into the other.
     """
     concierge_entry = await _setup_entry(hass, secret="guest-secret")
+
+    # The official mcp_server integration depends on conversation, which
+    # (as of HA 2026.7) expects the core "homeassistant" component's
+    # exposed-entities data to already exist once hass reaches the
+    # "started" state — the pytest-homeassistant-custom-component hass
+    # fixture doesn't set that up on its own.
+    assert await async_setup_component(hass, "homeassistant", {})
 
     mcp_server_entry = MockConfigEntry(
         domain="mcp_server",
