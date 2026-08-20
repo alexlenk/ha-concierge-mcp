@@ -67,3 +67,15 @@ async def test_verify_secret_rejects_a_home_assistant_style_access_token() -> No
         "9f8b6b7f0a1c2d3e4f5061728394a5b6c7d8e9f0"
     )
     assert auth.verify_secret(entry, f"Bearer {fake_long_lived_access_token}") is False
+
+
+async def test_verify_secret_rejects_non_ascii_bearer_token_without_crashing() -> None:
+    """hmac.compare_digest raises TypeError on non-ASCII str arguments.
+
+    Cloudflare Access forwards its own opaque bearer token in this same
+    header alongside the JWT assertion, so arbitrary client-controlled
+    values reach this check during normal operation — this must degrade to
+    a clean rejection, not an unhandled 500.
+    """
+    entry = _entry("correct-secret")
+    assert auth.verify_secret(entry, "Bearer opaque-tökén-☃") is False

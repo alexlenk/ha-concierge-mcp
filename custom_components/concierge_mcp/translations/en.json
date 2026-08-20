@@ -40,7 +40,7 @@
         "title": "Cloudflare Access sign-in (optional)",
         "description": "Lets you (a human, signed in through Cloudflare Access) use this endpoint directly — for example to add it to Claude.ai for testing — separately from the guest secret used by your chatbot backend. Leave either field blank to disable this and accept only the guest secret.",
         "data": {
-          "cf_access_team_domain": "Cloudflare Access team domain (e.g. myteam, without .cloudflareaccess.com)",
+          "cf_access_team_domain": "Cloudflare Access team domain (e.g. myteam — the full hostname or URL Cloudflare shows also works)",
           "cf_access_aud": "Access Application AUD tag"
         }
       }

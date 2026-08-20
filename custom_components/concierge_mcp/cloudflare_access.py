@@ -45,11 +45,36 @@ _LOGGER = logging.getLogger(__name__)
 _jwks_clients: dict[str, PyJWKClient] = {}
 
 
+def _normalize_team_domain(value: str | None) -> str | None:
+    """Normalize a team-domain value to the bare team name PyJWKClient needs.
+
+    Cloudflare displays this as a full hostname (``myteam.cloudflareaccess.com``)
+    and the authorization-server metadata reports it as a URL
+    (``https://myteam.cloudflareaccess.com``) — both are the obvious things
+    to paste, and pasting either used to silently double the suffix
+    (``myteam.cloudflareaccess.com.cloudflareaccess.com``), which doesn't
+    resolve. Strip whitespace, an optional scheme, any trailing path, and a
+    trailing ``.cloudflareaccess.com`` so all of those forms normalize to
+    ``myteam``. A whitespace-only value normalizes to None so the path stays
+    inert rather than building a bogus URL.
+    """
+    if not value:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    value = value.removeprefix("https://").removeprefix("http://")
+    value = value.split("/", 1)[0]
+    value = value.removesuffix(".cloudflareaccess.com")
+    return value or None
+
+
 def get_config(entry: ConfigEntry) -> tuple[str | None, str | None]:
     """Return (team_domain, aud) configured for this entry, if any."""
+    aud = entry.options.get(CONF_CF_ACCESS_AUD)
     return (
-        entry.options.get(CONF_CF_ACCESS_TEAM_DOMAIN),
-        entry.options.get(CONF_CF_ACCESS_AUD),
+        _normalize_team_domain(entry.options.get(CONF_CF_ACCESS_TEAM_DOMAIN)),
+        aud.strip() if aud else None,
     )
 
 
@@ -91,7 +116,27 @@ async def verify_jwt(
             audience=aud,
         )
     except jwt.PyJWTError as err:
-        _LOGGER.debug("Cloudflare Access JWT rejected: %s", err)
+        # This path is off by default and requires two explicit config
+        # values, so a rejection here means an operator is actively trying
+        # to sign in and failing — warning, not debug, so the most common
+        # misconfiguration (an aud tag that doesn't match) is diagnosable
+        # from the log instead of surfacing only as an opaque 401.
+        _LOGGER.warning(
+            "Cloudflare Access JWT rejected (team_domain=%s, expected aud=%s): %s",
+            team_domain,
+            aud,
+            err,
+        )
+        return False
+    except Exception:
+        # get_signing_key_from_jwt reaches the network via urllib, which can
+        # raise OSError/socket.timeout for DNS failures, TLS errors, or a
+        # connection timeout — not all of those are PyJWTError subclasses.
+        # This auth check must fail closed rather than surface as a 500.
+        _LOGGER.exception(
+            "Unexpected error verifying Cloudflare Access JWT (team_domain=%s)",
+            team_domain,
+        )
         return False
 
     return True

@@ -50,7 +50,13 @@ def verify_secret(entry: ConfigEntry, header_value: str | None) -> bool:
     if not provided:
         return False
 
-    return hmac.compare_digest(provided, stored)
+    # hmac.compare_digest raises TypeError on non-ASCII str arguments.
+    # Cloudflare Access forwards its own opaque bearer token in this same
+    # header alongside the JWT assertion, so arbitrary client-controlled
+    # values reach here in normal operation, not just hostile input —
+    # encoding both sides keeps every wrong credential on the same
+    # constant-time path instead of surfacing as an unhandled 500.
+    return hmac.compare_digest(provided.encode("utf-8"), stored.encode("utf-8"))
 
 
 __all__ = [
