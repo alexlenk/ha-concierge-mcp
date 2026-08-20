@@ -42,9 +42,26 @@ milestone's status changes; don't let it go stale.
   and the cross-integration isolation test running the real official
   `mcp_server` integration alongside this one in the same `hass` fixture
   (`tests/test_http.py::test_cross_integration_isolation_with_official_mcp_server`).
-- Manual end-to-end test against a real local HA instance + a simple MCP
-  test client is **not** done — this environment had no way to run a
-  live HA instance. Worth doing before calling M1 fully closed.
+- Manual end-to-end test against a real local HA instance now **has**
+  happened — the maintainer connected Claude.ai's custom connector against
+  a live deployment behind Cloudflare Access. This surfaced real
+  MCP-transport conformance gaps no unit test caught, since they only
+  matter against a real client: JSON-RPC errors returning HTTP 400 (killed
+  the client's session on any error at all), no protocol-version
+  negotiation, and missing `ping`/`resources/list`/`prompts/list` handlers
+  (issues #22, #23, #28 — fixed, tests backfilled). Also surfaced a
+  Cloudflare-side gotcha unrelated to this integration's code: Cloudflare's
+  "Block AI bots" setting 403s Claude.ai's backend before Access's OAuth
+  challenge is even issued (#29, documented in README).
+- That same round of live testing found four more real bugs in the
+  Cloudflare Access auth path, now fixed with regression tests: a
+  non-ASCII `Authorization` header crashed the guest-secret check with an
+  unhandled 500 (#26); a JWKS fetch failure that isn't a `PyJWTError`
+  (e.g. DNS failure) could do the same on the Cloudflare Access path
+  (#27); the team-domain field didn't accept the hostname/URL forms
+  Cloudflare itself displays, silently breaking JWKS lookups (#24); and
+  rejected JWTs logged at `debug`, making the most common
+  misconfiguration undiagnosable (#25).
 
 **M2 — CI hardening** (§16)
 

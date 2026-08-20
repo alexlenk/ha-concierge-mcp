@@ -165,6 +165,11 @@ async def test_non_jsonrpc_body_returns_invalid_request(hass, hass_client_no_aut
 
 
 async def test_unknown_method_returns_method_not_found(hass, hass_client_no_auth) -> None:
+    """A JSON-RPC-level error (unknown method) is HTTP 200: the message was
+    delivered successfully and happens to carry an error. A 4xx here would
+    make the official MCP client's raise_for_status() tear down the whole
+    session instead of surfacing the error (see http.py's module docstring
+    and _jsonrpc_error's docstring)."""
     await _setup_entry(hass)
     client = await hass_client_no_auth()
 
@@ -172,7 +177,7 @@ async def test_unknown_method_returns_method_not_found(hass, hass_client_no_auth
         API_URL, json=_rpc("not/a/real/method"), headers={"Authorization": "Bearer correct-secret"}
     )
 
-    assert resp.status == 400
+    assert resp.status == 200
     body = await resp.json()
     assert body["error"]["code"] == -32601
 
@@ -188,6 +193,102 @@ async def test_initialized_notification_returns_202_with_no_body(hass, hass_clie
     )
 
     assert resp.status == 202
+
+
+async def test_unrecognized_notification_returns_202_with_no_body(hass, hass_client_no_auth) -> None:
+    """Any notification (id-less method under notifications/), not just
+    notifications/initialized, must get a bare 202 per the JSON-RPC spec —
+    a notification MUST NOT receive a response body."""
+    await _setup_entry(hass)
+    client = await hass_client_no_auth()
+
+    resp = await client.post(
+        API_URL,
+        json={"jsonrpc": "2.0", "method": "notifications/cancelled"},
+        headers={"Authorization": "Bearer correct-secret"},
+    )
+
+    assert resp.status == 202
+
+
+async def test_initialize_echoes_supported_requested_protocol_version(
+    hass, hass_client_no_auth
+) -> None:
+    await _setup_entry(hass)
+    client = await hass_client_no_auth()
+
+    resp = await client.post(
+        API_URL,
+        json=_rpc("initialize", {"protocolVersion": "2024-11-05"}),
+        headers={"Authorization": "Bearer correct-secret"},
+    )
+
+    body = await resp.json()
+    assert body["result"]["protocolVersion"] == "2024-11-05"
+
+
+async def test_initialize_falls_back_to_own_version_for_unsupported_request(
+    hass, hass_client_no_auth
+) -> None:
+    await _setup_entry(hass)
+    client = await hass_client_no_auth()
+
+    resp = await client.post(
+        API_URL,
+        json=_rpc("initialize", {"protocolVersion": "1999-01-01"}),
+        headers={"Authorization": "Bearer correct-secret"},
+    )
+
+    body = await resp.json()
+    assert body["result"]["protocolVersion"] == "2025-06-18"
+
+
+async def test_ping_returns_empty_result(hass, hass_client_no_auth) -> None:
+    await _setup_entry(hass)
+    client = await hass_client_no_auth()
+
+    resp = await client.post(
+        API_URL, json=_rpc("ping"), headers={"Authorization": "Bearer correct-secret"}
+    )
+
+    assert resp.status == 200
+    body = await resp.json()
+    assert body["result"] == {}
+
+
+async def test_resources_and_prompts_list_return_empty(hass, hass_client_no_auth) -> None:
+    await _setup_entry(hass)
+    client = await hass_client_no_auth()
+    headers = {"Authorization": "Bearer correct-secret"}
+
+    resources = await client.post(API_URL, json=_rpc("resources/list"), headers=headers)
+    templates = await client.post(API_URL, json=_rpc("resources/templates/list"), headers=headers)
+    prompts = await client.post(API_URL, json=_rpc("prompts/list"), headers=headers)
+
+    assert (await resources.json())["result"] == {"resources": []}
+    assert (await templates.json())["result"] == {"resources": []}
+    assert (await prompts.json())["result"] == {"prompts": []}
+
+
+async def test_get_returns_405(hass, hass_client_no_auth) -> None:
+    """No SSE stream is offered; the spec sanctions 405 here."""
+    await _setup_entry(hass)
+    client = await hass_client_no_auth()
+
+    resp = await client.get(API_URL)
+
+    assert resp.status == 405
+
+
+async def test_delete_returns_405(hass, hass_client_no_auth) -> None:
+    """Stateless endpoint: no Mcp-Session-Id is ever issued, so there is
+    nothing for a client to explicitly tear down."""
+    await _setup_entry(hass)
+    client = await hass_client_no_auth()
+
+    resp = await client.delete(API_URL)
+
+    assert resp.status == 405
 
 
 async def test_removed_entry_returns_503_instead_of_crashing(hass, hass_client_no_auth) -> None:

@@ -109,6 +109,48 @@ exist. It never weakens or replaces the guest secret; either credential is
 independently sufficient, and compromising one path doesn't touch the
 other.
 
+### Troubleshooting: Claude.ai connector fails before any login screen appears
+
+If Claude.ai's custom connector fails immediately with an error like
+`Authorization with ... failed` or `Couldn't register with ...'s sign-in
+service`, and referencing an `ofid_...` code, and **no request shows up in
+Home Assistant's logs at all**, the request likely never reached Home
+Assistant. Cloudflare's dashboard-level **"Block AI bots"** setting matches
+Claude's backend user-agent (e.g. `Claude-User/1.0 (+https://claude.ai)`)
+and returns a bare `403` before Cloudflare Access's own OAuth challenge is
+ever issued — indistinguishable, from the outside, from a broken OAuth
+setup.
+
+**The diagnostic rule:** a `403` with no `WWW-Authenticate` header means the
+request was blocked at Cloudflare's edge, before it reached Access or this
+integration — check this before auditing anything about OAuth. Confirm with:
+
+```
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -A 'Claude-User/1.0 (+https://claude.ai)' \
+  -X POST https://<your-hostname>/api/concierge_mcp
+```
+
+- `403` (and no `WWW-Authenticate` on a `-I`/verbose request) → Cloudflare's
+  bot blocking is the problem, not this integration or Access.
+- `401` with `WWW-Authenticate` present → the request reached Access
+  correctly; the challenge is being issued as expected.
+
+**Fix:** in the Cloudflare dashboard, under Security → Bots, disable **Block
+AI bots** / **Block AI training bots** for this hostname — Cloudflare Access
+plus this integration's own JWT check still protect the endpoint. If the
+setting must stay on zone-wide, add a WAF custom rule (Security → WAF →
+Custom rules) that **Skip**s bot management for just this endpoint's paths,
+placed first:
+
+```
+(http.host eq "<your-hostname>")
+and (
+  starts_with(http.request.uri.path, "/api/concierge_mcp")
+  or starts_with(http.request.uri.path, "/.well-known/")
+)
+```
+
 ## Development
 
 ```

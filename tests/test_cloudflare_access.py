@@ -7,6 +7,7 @@ touched this feature must not be newly exposed by its mere existence.
 """
 from __future__ import annotations
 
+import logging
 import time
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -76,6 +77,31 @@ async def test_get_config_returns_none_when_unset(hass) -> None:
     assert cloudflare_access.get_config(entry) == (None, None)
 
 
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "myteam",
+        "myteam.cloudflareaccess.com",
+        "https://myteam.cloudflareaccess.com",
+        "https://myteam.cloudflareaccess.com/",
+        "  myteam  ",
+    ],
+)
+async def test_get_config_normalizes_team_domain_forms_cloudflare_displays(
+    hass, raw
+) -> None:
+    """Cloudflare shows the team domain as a hostname or URL, not the bare
+    team name the JWKS URL needs — pasting either used to silently double
+    the .cloudflareaccess.com suffix and break lookups undetectably (#24)."""
+    entry = _entry(hass, team_domain=raw, aud=AUD)
+    assert cloudflare_access.get_config(entry) == ("myteam", AUD)
+
+
+async def test_get_config_normalizes_whitespace_only_team_domain_to_none(hass) -> None:
+    entry = _entry(hass, team_domain="   ", aud=AUD)
+    assert cloudflare_access.get_config(entry) == (None, AUD)
+
+
 async def test_verify_jwt_rejects_when_not_configured_even_with_a_valid_looking_header(
     hass, keypair
 ) -> None:
@@ -124,6 +150,43 @@ async def test_verify_jwt_rejects_expired_token(hass, keypair) -> None:
 async def test_verify_jwt_rejects_garbage_token_without_crashing(hass) -> None:
     entry = _entry(hass, team_domain=TEAM_DOMAIN, aud=AUD)
     assert await cloudflare_access.verify_jwt(hass, entry, "not-a-jwt-at-all") is False
+
+
+async def test_verify_jwt_rejects_wrong_audience_logs_warning_with_context(
+    hass, keypair, caplog
+) -> None:
+    """A rejection is an operator actively trying to sign in and failing —
+    actionable, not routine noise (#25) — so it must be visible at the
+    default log level and name the expected aud, without logging the token
+    itself."""
+    private_pem, public_pem = keypair
+    entry = _entry(hass, team_domain=TEAM_DOMAIN, aud=AUD)
+    token = _sign(private_pem, aud="some-other-app")
+
+    with _patched_signing_key(public_pem), caplog.at_level(logging.WARNING):
+        assert await cloudflare_access.verify_jwt(hass, entry, token) is False
+
+    assert any(
+        record.levelno == logging.WARNING
+        and TEAM_DOMAIN in record.message
+        and AUD in record.message
+        for record in caplog.records
+    )
+    assert not any(token in record.message for record in caplog.records)
+
+
+async def test_verify_jwt_fails_closed_on_non_pyjwt_error_from_jwks_fetch(hass) -> None:
+    """get_signing_key_from_jwt reaches the network via urllib, which can
+    raise OSError/socket.timeout — not a PyJWTError subclass — for a DNS
+    failure or connection timeout. This must degrade to "not authenticated",
+    not an unhandled 500 (#27)."""
+    entry = _entry(hass, team_domain=TEAM_DOMAIN, aud=AUD)
+
+    with patch(
+        "jwt.PyJWKClient.get_signing_key_from_jwt",
+        side_effect=OSError("name resolution failed"),
+    ):
+        assert await cloudflare_access.verify_jwt(hass, entry, "some-token") is False
 
 
 async def test_verify_jwt_rejects_wrong_signing_key(hass, keypair) -> None:
