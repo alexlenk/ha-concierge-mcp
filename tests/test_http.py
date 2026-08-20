@@ -7,19 +7,41 @@ and two integrations set up in the same instance don't interfere.
 """
 from __future__ import annotations
 
+import time
+from types import SimpleNamespace
+from unittest.mock import patch
+
+import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.concierge_mcp.const import API_URL, DOMAIN
+from custom_components.concierge_mcp.const import (
+    API_URL,
+    CONF_CF_ACCESS_AUD,
+    CONF_CF_ACCESS_TEAM_DOMAIN,
+    DOMAIN,
+    HEADER_CF_ACCESS_JWT,
+)
 
 ENTITIES = [{"entity_id": "lock.front_door", "read": True, "control": False}]
 
 
-async def _setup_entry(hass, *, secret: str = "correct-secret", entities: list | None = None) -> MockConfigEntry:
+async def _setup_entry(
+    hass,
+    *,
+    secret: str = "correct-secret",
+    entities: list | None = None,
+    cf_access: dict | None = None,
+) -> MockConfigEntry:
+    options = {"entities": entities if entities is not None else ENTITIES}
+    if cf_access:
+        options.update(cf_access)
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={"secret": secret},
-        options={"entities": entities if entities is not None else ENTITIES},
+        options=options,
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -230,3 +252,73 @@ async def test_cross_integration_isolation_with_official_mcp_server(
         "/api/mcp", json=_rpc("tools/list"), headers={"Authorization": "Bearer guest-secret"}
     )
     assert official_with_our_secret.status in (401, 403)
+
+
+def _sign_cf_access_jwt(private_pem: bytes, *, aud: str) -> str:
+
+
+    return jwt.encode(
+        {"aud": aud, "sub": "operator@example.com", "exp": int(time.time()) + 300},
+        private_pem,
+        algorithm="RS256",
+        headers={"kid": "test-key"},
+    )
+
+
+def _rsa_keypair() -> tuple[bytes, bytes]:
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return private_pem, public_pem
+
+
+async def test_valid_cloudflare_access_jwt_succeeds_when_configured(
+    hass, hass_client_no_auth
+) -> None:
+
+    private_pem, public_pem = _rsa_keypair()
+    await _setup_entry(
+        hass, cf_access={CONF_CF_ACCESS_TEAM_DOMAIN: "myteam", CONF_CF_ACCESS_AUD: "test-aud"}
+    )
+    token = _sign_cf_access_jwt(private_pem, aud="test-aud")
+    client = await hass_client_no_auth()
+
+    with patch(
+        "jwt.PyJWKClient.get_signing_key_from_jwt",
+        return_value=SimpleNamespace(key=public_pem),
+    ):
+        resp = await client.post(
+            API_URL, json=_rpc("tools/list"), headers={HEADER_CF_ACCESS_JWT: token}
+        )
+
+    assert resp.status == 200
+
+
+async def test_cloudflare_access_jwt_ignored_when_not_configured(
+    hass, hass_client_no_auth
+) -> None:
+    """The critical regression test: this header must not grant access on
+    an entry that never opted into the Cloudflare Access auth path."""
+
+    private_pem, public_pem = _rsa_keypair()
+    await _setup_entry(hass)  # no cf_access configured
+    token = _sign_cf_access_jwt(private_pem, aud="test-aud")
+    client = await hass_client_no_auth()
+
+    with patch(
+        "jwt.PyJWKClient.get_signing_key_from_jwt",
+        return_value=SimpleNamespace(key=public_pem),
+    ):
+        resp = await client.post(
+            API_URL, json=_rpc("tools/list"), headers={HEADER_CF_ACCESS_JWT: token}
+        )
+
+    assert resp.status == 401

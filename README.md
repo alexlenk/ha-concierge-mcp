@@ -49,6 +49,11 @@ have.
   explicit MCP-level error, never a silent no-op and never a crash.
 - The allowlist is managed entirely through the integration's Options
   flow (an entity picker) — no YAML editing.
+- An optional second, independent auth path for a human operator to use
+  the endpoint interactively (e.g. adding it to Claude.ai for testing),
+  via Cloudflare Access — see [Interactive access via Cloudflare
+  Access](#interactive-access-via-cloudflare-access-optional) below. Off
+  by default; the guest secret is unaffected either way.
 
 Write/control actions are intentionally out of scope for v1 (see the
 design document in this repo for what's planned for v2).
@@ -76,6 +81,33 @@ design document in this repo for what's planned for v2).
   Trust tunnel). It is not designed to be exposed directly to the raw
   internet: there is no in-integration rate limiting or brute-force
   protection in v1.
+
+## Interactive access via Cloudflare Access (optional)
+
+The guest secret is built for a headless client (a chatbot backend) —
+there's no browser to complete an OAuth redirect. If you want to use this
+endpoint yourself interactively (for example, adding it to Claude.ai as a
+custom connector for testing), the guest secret isn't the right fit for
+that: OAuth, where you sign in as yourself, is.
+
+This integration doesn't implement OAuth itself. Instead, it recognizes a
+second, completely independent credential: a signed JWT from [Cloudflare
+Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/)
+sitting in front of this endpoint (through the same Cloudflare Tunnel
+already required above). Cloudflare Access runs the entire OAuth flow at
+its edge — sign-in, consent, token issuance — and forwards a signed
+`Cf-Access-Jwt-Assertion` header once you're authenticated. This
+integration verifies that JWT's signature against Cloudflare's own public
+keys and checks its `aud` claim against the specific Access Application
+you configure, which is what scopes it to only this endpoint.
+
+**This path is off by default.** Configure it from the integration's
+options ("Configure Cloudflare Access sign-in") only if you want it — both
+the Cloudflare Access team domain and the Access Application's AUD tag
+must be set, or every request is evaluated as if this feature doesn't
+exist. It never weakens or replaces the guest secret; either credential is
+independently sufficient, and compromising one path doesn't touch the
+other.
 
 ## Development
 

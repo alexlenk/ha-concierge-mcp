@@ -20,7 +20,19 @@ milestone's status changes; don't let it go stale.
   internals (`icon`, `supported_features`, etc.) from `attributes` rather
   than passing the raw dict through, and `list_entities` caps at 50
   results with a truncation message rather than being unbounded.
-- Full local pytest suite (39 tests) using
+- Added a second, independent, opt-in auth path
+  (`cloudflare_access.py`) for a human operator to use the endpoint
+  interactively — e.g. adding it to Claude.ai for testing — via a
+  Cloudflare Access JWT (`Cf-Access-Jwt-Assertion` header), verified
+  against Cloudflare's own public keys with `aud` checked against a
+  specific Access Application. Entirely additive: inert unless both
+  `cf_access_team_domain` and `cf_access_aud` are explicitly configured
+  in options, never a fallback that weakens the guest-secret path. Found
+  and fixed a latent bug while adding this: each options-flow step was
+  overwriting `entry.options` wholesale instead of merging, which would
+  have let saving the allowlist silently wipe out Cloudflare Access
+  config (or vice versa) — all steps now merge into the existing options.
+- Full local pytest suite (51 tests) using
   `pytest-homeassistant-custom-component`, run against a real installed
   `homeassistant` (2026.2.3 at the time this was written) — not just
   written and assumed correct. 100% line coverage, `ruff` clean.
