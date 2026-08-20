@@ -2,13 +2,16 @@ name: Auto Tag Release
 
 # Fixes the failure mode in issue #30: a manifest.json version bump that
 # lands on main is worthless to HACS users until *something* pushes a
-# matching `vX.Y.Z` tag — release.yml only runs on tag push, and nothing
-# was doing that automatically, so it depended on a human remembering a
-# manual step. This closes that gap without duplicating release.yml's own
-# job (test → validate → create the GitHub Release): it only tags: it
-# leaves creating the actual release to the existing tag-triggered
-# workflow, so there is exactly one place that decides whether a version
-# is fit to publish.
+# matching `vX.Y.Z` tag and publishes a GitHub Release. Originally this
+# workflow only pushed the tag and left release.yml's `push: tags`
+# trigger to take it from there — but GitHub deliberately does not let
+# workflow runs authenticated with the default GITHUB_TOKEN trigger
+# other workflows (loop prevention), so that tag push never fired
+# release.yml and no release was ever created. This workflow now owns
+# the whole automated path itself: tag, then release, in the same job.
+# release.yml's own `push: tags` trigger still covers a human manually
+# pushing a tag, and its `workflow_dispatch` trigger is a manual escape
+# hatch for re-publishing an existing tag.
 
 on:
   push:
@@ -44,3 +47,46 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "v${{ steps.check.outputs.version }}" -m "Release v${{ steps.check.outputs.version }}"
           git push origin "v${{ steps.check.outputs.version }}"
+
+      - name: Extract release notes from CHANGELOG
+        id: release-notes
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          version="${{ steps.check.outputs.version }}"
+          notes_file="/tmp/release_notes.md"
+
+          # Range form `/start/,/end/` fails here because the start line also
+          # matches the end pattern (`^## \[`), so the range activates and
+          # deactivates on the same line and nothing gets printed.
+          awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { in_section = 1; next }
+            in_section && /^## \[/ { exit }
+            in_section { print }
+          ' CHANGELOG.md > "$notes_file"
+
+          sed -i '/./,$!d' "$notes_file"
+          sed -i -e :a -e '/^\s*$/d;N;ba' "$notes_file"
+
+          if [ ! -s "$notes_file" ]; then
+            echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)." > "$notes_file"
+          fi
+
+          {
+            echo "notes<<RELEASE_NOTES_EOF"
+            cat "$notes_file"
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat > /tmp/release_body.md << 'RELEASE_NOTES_EOF'
+          ${{ steps.release-notes.outputs.notes }}
+          RELEASE_NOTES_EOF
+
+          gh release create "v${{ steps.check.outputs.version }}" \
+            --title "v${{ steps.check.outputs.version }}" \
+            --notes-file /tmp/release_body.md \
+            --latest
