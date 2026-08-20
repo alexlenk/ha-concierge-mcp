@@ -14,7 +14,13 @@ milestone's status changes; don't let it go stale.
   secret regeneration), the `ConciergeMCPView` HTTP endpoint at
   `/api/concierge_mcp` with its own `hmac.compare_digest` secret check,
   `get_state`/`list_entities` MCP tools, diagnostics redaction.
-- Full local pytest suite (36 tests) using
+- Tool responses were checked against Anthropic's tool-design guidance
+  (namespacing, high-signal responses, natural-language identifiers,
+  truncation for large results): `get_state` strips low-signal HA
+  internals (`icon`, `supported_features`, etc.) from `attributes` rather
+  than passing the raw dict through, and `list_entities` caps at 50
+  results with a truncation message rather than being unbounded.
+- Full local pytest suite (39 tests) using
   `pytest-homeassistant-custom-component`, run against a real installed
   `homeassistant` (2026.2.3 at the time this was written) — not just
   written and assumed correct. 100% line coverage, `ruff` clean.

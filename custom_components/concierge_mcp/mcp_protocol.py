@@ -37,6 +37,25 @@ from .const import (
     TOOL_LIST_ENTITIES,
 )
 
+# Home Assistant attribute keys that are internal plumbing rather than
+# information a guest-facing chatbot's tool call would ever need — icon
+# identifiers, opaque feature bitmasks, and the like. Everything else
+# passes through unfiltered, since domain-specific attributes (e.g.
+# "current_temperature", or whatever custom attribute an operator stores
+# for a checkout-time sensor) can't be safely guessed at generically.
+_LOW_SIGNAL_ATTRIBUTES = frozenset(
+    {"icon", "entity_picture", "supported_features", "assumed_state", "attribution"}
+)
+
+# Anthropic's own tool-design guidance uses 50 as a reasonable default cap
+# for potentially-large list responses; there's no operator-facing reason
+# to expect an allowlist much bigger than that for a guest chatbot's use case.
+MAX_LISTED_ENTITIES = 50
+
+
+def _filter_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in attributes.items() if k not in _LOW_SIGNAL_ATTRIBUTES}
+
 GET_STATE_TOOL = types.Tool(
     name=TOOL_GET_STATE,
     description="Get the current state and attributes of an allowlisted entity.",
@@ -78,8 +97,11 @@ def _error_result(code: str, message: str) -> tuple[list[types.TextContent], boo
 
 
 def _list_entities(hass: HomeAssistant, entry: ConfigEntry) -> tuple[list[types.TextContent], bool]:
+    allowed_ids = allowlist.list_allowed(entry, action=CONF_READ)
+    truncated = len(allowed_ids) > MAX_LISTED_ENTITIES
+
     entities = []
-    for entity_id in allowlist.list_allowed(entry, action=CONF_READ):
+    for entity_id in allowed_ids[:MAX_LISTED_ENTITIES]:
         state = hass.states.get(entity_id)
         entities.append(
             {
@@ -88,7 +110,17 @@ def _list_entities(hass: HomeAssistant, entry: ConfigEntry) -> tuple[list[types.
                 "available": state is not None,
             }
         )
-    content = [types.TextContent(type="text", text=json.dumps({"entities": entities}))]
+
+    payload: dict[str, Any] = {"entities": entities}
+    if truncated:
+        payload["truncated"] = True
+        payload["message"] = (
+            f"Showing {MAX_LISTED_ENTITIES} of {len(allowed_ids)} allowlisted entities. "
+            "This tool does not support pagination — ask the operator to narrow the "
+            "allowlist if you need entities beyond this list."
+        )
+
+    content = [types.TextContent(type="text", text=json.dumps(payload))]
     return content, False
 
 
@@ -115,7 +147,7 @@ def _get_state(
                 {
                     "entity_id": state.entity_id,
                     "state": state.state,
-                    "attributes": dict(state.attributes),
+                    "attributes": _filter_attributes(dict(state.attributes)),
                 }
             ),
         )

@@ -39,6 +39,37 @@ async def test_list_entities_reflects_allowlist(hass) -> None:
     assert "light.not_exposed" not in entity_ids
 
 
+async def test_list_entities_truncates_beyond_cap(hass) -> None:
+    cap = mcp_protocol.MAX_LISTED_ENTITIES
+    allowed = []
+    for i in range(cap + 5):
+        entity_id = f"sensor.entity_{i}"
+        hass.states.async_set(entity_id, "on", {"friendly_name": f"Entity {i}"})
+        allowed.append({"entity_id": entity_id, "read": True, "control": False})
+    entry = _entry(hass, allowed)
+
+    content, is_error = await mcp_protocol.call_tool(hass, entry, TOOL_LIST_ENTITIES, {})
+
+    assert is_error is False
+    payload = json.loads(content[0].text)
+    assert len(payload["entities"]) == cap
+    assert payload["truncated"] is True
+    assert str(cap) in payload["message"]
+    assert str(cap + 5) in payload["message"]
+
+
+async def test_list_entities_under_cap_has_no_truncation_marker(hass) -> None:
+    hass.states.async_set("light.kitchen", "on", {"friendly_name": "Kitchen Light"})
+    entry = _entry(hass, [{"entity_id": "light.kitchen", "read": True, "control": False}])
+
+    content, is_error = await mcp_protocol.call_tool(hass, entry, TOOL_LIST_ENTITIES, {})
+
+    assert is_error is False
+    payload = json.loads(content[0].text)
+    assert "truncated" not in payload
+    assert "message" not in payload
+
+
 async def test_get_state_returns_state_for_allowed_entity(hass) -> None:
     hass.states.async_set("lock.front_door", "locked", {"friendly_name": "Front Door"})
     entry = _entry(hass, [{"entity_id": "lock.front_door", "read": True, "control": False}])
@@ -51,6 +82,31 @@ async def test_get_state_returns_state_for_allowed_entity(hass) -> None:
     payload = json.loads(content[0].text)
     assert payload["entity_id"] == "lock.front_door"
     assert payload["state"] == "locked"
+
+
+async def test_get_state_filters_low_signal_attributes(hass) -> None:
+    hass.states.async_set(
+        "light.kitchen",
+        "on",
+        {
+            "friendly_name": "Kitchen Light",
+            "icon": "mdi:lightbulb",
+            "entity_picture": "/local/kitchen.png",
+            "supported_features": 63,
+            "assumed_state": True,
+            "attribution": "Data provided by Example",
+            "brightness": 128,
+        },
+    )
+    entry = _entry(hass, [{"entity_id": "light.kitchen", "read": True, "control": False}])
+
+    content, is_error = await mcp_protocol.call_tool(
+        hass, entry, TOOL_GET_STATE, {"entity_id": "light.kitchen"}
+    )
+
+    assert is_error is False
+    attributes = json.loads(content[0].text)["attributes"]
+    assert attributes == {"friendly_name": "Kitchen Light", "brightness": 128}
 
 
 async def test_get_state_rejects_entity_outside_allowlist(hass) -> None:
