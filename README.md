@@ -1,5 +1,7 @@
 # Concierge MCP Server
 
+![Concierge MCP logo](custom_components/concierge_mcp/brand/logo.png)
+
 A Home Assistant custom integration that exposes a small, operator-curated
 allowlist of entities over the [Model Context Protocol](https://modelcontextprotocol.io)
 to a low-trust, external client — for example a guest-facing chatbot for a
