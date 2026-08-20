@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import jwt
+import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from homeassistant.setup import async_setup_component
@@ -24,6 +25,10 @@ from custom_components.concierge_mcp.const import (
     DOMAIN,
     HEADER_CF_ACCESS_JWT,
 )
+
+# This module sets the domain up for real via hass.config_entries.async_setup,
+# which requires the loader to be able to discover custom_components.
+pytestmark = pytest.mark.usefixtures("enable_custom_integrations")
 
 ENTITIES = [{"entity_id": "lock.front_door", "read": True, "control": False}]
 
@@ -117,7 +122,7 @@ async def test_tools_list_reflects_current_allowlist(hass, hass_client_no_auth) 
 
     body = await resp.json()
     tool_names = {t["name"] for t in body["result"]["tools"]}
-    assert tool_names == {"get_state", "list_entities"}
+    assert tool_names == {"get_state", "list_entities", "get_history"}
 
 
 async def test_tools_call_rejects_entity_outside_allowlist(hass, hass_client_no_auth) -> None:

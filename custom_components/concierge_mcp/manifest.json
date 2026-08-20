@@ -1,6 +1,7 @@
 {
   "domain": "concierge_mcp",
   "name": "Concierge MCP Server",
+  "after_dependencies": ["recorder"],
   "codeowners": ["@alexlenk"],
   "config_flow": true,
   "dependencies": ["http", "diagnostics"],

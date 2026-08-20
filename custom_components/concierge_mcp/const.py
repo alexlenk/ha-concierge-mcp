@@ -33,6 +33,12 @@ MCP_PROTOCOL_VERSION = "2025-06-18"
 
 TOOL_GET_STATE = "get_state"
 TOOL_LIST_ENTITIES = "list_entities"
+TOOL_GET_HISTORY = "get_history"
 
 ERROR_NOT_ALLOWED = "entity_not_allowed"
 ERROR_NOT_FOUND = "entity_not_found"
+ERROR_HISTORY_UNAVAILABLE = "history_unavailable"
+
+DEFAULT_HISTORY_HOURS = 24
+MAX_HISTORY_HOURS = 168  # 7 days
+MAX_HISTORY_STATES = 100

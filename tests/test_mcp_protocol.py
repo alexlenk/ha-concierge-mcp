@@ -3,11 +3,18 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.components.recorder.common import (
+    async_wait_recording_done,
+)
 
 from custom_components.concierge_mcp import mcp_protocol
 from custom_components.concierge_mcp.const import (
     DOMAIN,
+    MAX_HISTORY_HOURS,
+    MAX_HISTORY_STATES,
+    TOOL_GET_HISTORY,
     TOOL_GET_STATE,
     TOOL_LIST_ENTITIES,
 )
@@ -22,7 +29,7 @@ def _entry(hass, entities):
 def test_list_tools_returns_fixed_v1_toolset() -> None:
     tools = mcp_protocol.list_tools()
     names = {t.name for t in tools}
-    assert names == {TOOL_GET_STATE, TOOL_LIST_ENTITIES}
+    assert names == {TOOL_GET_STATE, TOOL_LIST_ENTITIES, TOOL_GET_HISTORY}
 
 
 async def test_list_entities_reflects_allowlist(hass) -> None:
@@ -144,3 +151,110 @@ async def test_unknown_tool_returns_explicit_error_not_crash(hass) -> None:
     assert is_error is True
     payload = json.loads(content[0].text)
     assert payload["error"] == "unknown_tool"
+
+
+@pytest.mark.usefixtures("recorder_mock")
+async def test_get_history_returns_state_transitions_for_allowed_entity(hass) -> None:
+    entry = _entry(hass, [{"entity_id": "lock.front_door", "read": True, "control": False}])
+    hass.states.async_set("lock.front_door", "locked", {})
+    await hass.async_block_till_done()
+    hass.states.async_set("lock.front_door", "unlocked", {})
+    await async_wait_recording_done(hass)
+
+    content, is_error = await mcp_protocol.call_tool(
+        hass, entry, TOOL_GET_HISTORY, {"entity_id": "lock.front_door"}
+    )
+
+    assert is_error is False
+    payload = json.loads(content[0].text)
+    assert payload["entity_id"] == "lock.front_door"
+    assert payload["hours"] == 24
+    states = [entry["state"] for entry in payload["history"]]
+    assert states == ["locked", "unlocked"]
+    assert all("last_changed" in entry for entry in payload["history"])
+
+
+@pytest.mark.usefixtures("recorder_mock")
+async def test_get_history_rejects_entity_outside_allowlist(hass) -> None:
+    hass.states.async_set("lock.back_door", "locked", {})
+    await async_wait_recording_done(hass)
+    entry = _entry(hass, [])  # nothing allowlisted
+
+    content, is_error = await mcp_protocol.call_tool(
+        hass, entry, TOOL_GET_HISTORY, {"entity_id": "lock.back_door"}
+    )
+
+    assert is_error is True
+    payload = json.loads(content[0].text)
+    assert payload["error"] == "entity_not_allowed"
+
+
+@pytest.mark.usefixtures("recorder_mock")
+async def test_get_history_does_not_crash_on_missing_entity_id(hass) -> None:
+    entry = _entry(hass, [])
+    _content, is_error = await mcp_protocol.call_tool(hass, entry, TOOL_GET_HISTORY, {})
+    assert is_error is True
+
+
+@pytest.mark.usefixtures("recorder_mock")
+async def test_get_history_rejects_non_positive_hours(hass) -> None:
+    entry = _entry(hass, [{"entity_id": "lock.front_door", "read": True, "control": False}])
+
+    content, is_error = await mcp_protocol.call_tool(
+        hass, entry, TOOL_GET_HISTORY, {"entity_id": "lock.front_door", "hours": 0}
+    )
+
+    assert is_error is True
+    payload = json.loads(content[0].text)
+    assert payload["error"] == "invalid_arguments"
+
+
+@pytest.mark.usefixtures("recorder_mock")
+async def test_get_history_clamps_hours_above_cap(hass) -> None:
+    entry = _entry(hass, [{"entity_id": "lock.front_door", "read": True, "control": False}])
+    hass.states.async_set("lock.front_door", "locked", {})
+    await async_wait_recording_done(hass)
+
+    content, is_error = await mcp_protocol.call_tool(
+        hass,
+        entry,
+        TOOL_GET_HISTORY,
+        {"entity_id": "lock.front_door", "hours": MAX_HISTORY_HOURS + 100},
+    )
+
+    assert is_error is False
+    payload = json.loads(content[0].text)
+    assert payload["hours"] == MAX_HISTORY_HOURS
+    assert "message" in payload
+
+
+@pytest.mark.usefixtures("recorder_mock")
+async def test_get_history_truncates_beyond_cap(hass) -> None:
+    entry = _entry(hass, [{"entity_id": "sensor.counter", "read": True, "control": False}])
+    for i in range(MAX_HISTORY_STATES + 5):
+        hass.states.async_set("sensor.counter", str(i), {})
+    await async_wait_recording_done(hass)
+
+    content, is_error = await mcp_protocol.call_tool(
+        hass, entry, TOOL_GET_HISTORY, {"entity_id": "sensor.counter"}
+    )
+
+    assert is_error is False
+    payload = json.loads(content[0].text)
+    assert len(payload["history"]) == MAX_HISTORY_STATES
+    assert payload["truncated"] is True
+    # The most recent states are kept, not the oldest.
+    assert payload["history"][-1]["state"] == str(MAX_HISTORY_STATES + 4)
+
+
+async def test_get_history_unavailable_without_recorder(hass) -> None:
+    """No recorder_mock fixture here — recorder is genuinely not set up."""
+    entry = _entry(hass, [{"entity_id": "lock.front_door", "read": True, "control": False}])
+
+    content, is_error = await mcp_protocol.call_tool(
+        hass, entry, TOOL_GET_HISTORY, {"entity_id": "lock.front_door"}
+    )
+
+    assert is_error is True
+    payload = json.loads(content[0].text)
+    assert payload["error"] == "history_unavailable"

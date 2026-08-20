@@ -1,6 +1,7 @@
 """Tests for the config flow and options flow."""
 from __future__ import annotations
 
+import pytest
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -12,6 +13,10 @@ from custom_components.concierge_mcp.const import (
     CONF_SECRET,
     DOMAIN,
 )
+
+# This module drives real config/options flows for our domain, which
+# requires the loader to be able to discover custom_components.
+pytestmark = pytest.mark.usefixtures("enable_custom_integrations")
 
 
 async def test_full_setup_flow_generates_and_shows_secret_once(hass) -> None:

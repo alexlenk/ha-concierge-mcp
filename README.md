@@ -40,11 +40,15 @@ have.
   HTTP transport (stateless JSON-RPC over POST).
 - Authenticated by a guest secret this integration generates and owns —
   never a Home Assistant access token, never checked against `hass.auth`.
-- Two read-only tools:
+- Three read-only tools:
   - `list_entities()` — discovery: the allowlisted entities and their
     friendly names.
   - `get_state(entity_id)` — state and attributes for one allowlisted
     entity.
+  - `get_history(entity_id, hours=24)` — recent state transitions for one
+    allowlisted entity (e.g. "when was the door unlocked"). Requires Home
+    Assistant's `recorder` integration; capped at 7 days of lookback and
+    100 returned transitions, both enforced server-side.
 - Any call referencing an entity outside the allowlist is rejected with an
   explicit MCP-level error, never a silent no-op and never a crash.
 - The allowlist is managed entirely through the integration's Options
@@ -67,6 +71,18 @@ design document in this repo for what's planned for v2).
    Server".
 4. Copy the guest secret shown during setup — it is shown once.
 5. Open the integration's options and pick the entities to expose.
+
+## Updating
+
+HACS installs and updates from tagged GitHub Releases, never from `main`
+directly — a fix merged to `main` isn't available to install until a
+release is tagged (this repo automates that: a manifest version bump on
+`main` gets tagged and released automatically).
+
+After updating, **restart Home Assistant fully** — "Reload" on the
+integration is not enough. A custom component's Python is only re-imported
+on a full restart, so a patched file with a stale process behind it will
+look like the update had no effect.
 
 ## Security model
 
