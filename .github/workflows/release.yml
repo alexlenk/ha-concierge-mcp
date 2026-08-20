@@ -1,9 +1,16 @@
 name: Release
 
+# Covers the two paths auto-tag.yml doesn't: a human manually pushing a
+# `vX.Y.Z` tag directly, and workflow_dispatch as a manual escape hatch
+# to (re-)publish the release for a tag that already exists (GITHUB_REF
+# comes from whichever ref the dispatch targets, so this works the same
+# way as the tag-push trigger below).
+
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 jobs:
   release:
