@@ -124,5 +124,5 @@ def _jsonrpc_result(request_id: Any, result: dict[str, Any]) -> web.Response:
 def _jsonrpc_error(request_id: Any, code: int, message: str) -> web.Response:
     return web.json_response(
         {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}},
-        status=400,
+        status=200,
     )
