@@ -5,7 +5,13 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.concierge_mcp.const import CONF_ENTITIES, CONF_SECRET, DOMAIN
+from custom_components.concierge_mcp.const import (
+    CONF_CF_ACCESS_AUD,
+    CONF_CF_ACCESS_TEAM_DOMAIN,
+    CONF_ENTITIES,
+    CONF_SECRET,
+    DOMAIN,
+)
 
 
 async def test_full_setup_flow_generates_and_shows_secret_once(hass) -> None:
@@ -91,3 +97,69 @@ async def test_options_flow_regenerate_secret_invalidates_old(hass) -> None:
 
     assert entry.data["secret"] == new_secret
     assert entry.data["secret"] != "old-secret"
+
+
+async def test_options_flow_configures_cloudflare_access(hass) -> None:
+    entry = await _setup_entry(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "cloudflare_access"}
+    )
+    assert result2["step_id"] == "cloudflare_access"
+
+    result3 = await hass.config_entries.options.async_configure(
+        result2["flow_id"],
+        {CONF_CF_ACCESS_TEAM_DOMAIN: "myteam", CONF_CF_ACCESS_AUD: "test-aud-tag"},
+    )
+    assert result3["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+
+    assert entry.options[CONF_CF_ACCESS_TEAM_DOMAIN] == "myteam"
+    assert entry.options[CONF_CF_ACCESS_AUD] == "test-aud-tag"
+
+
+async def test_options_flow_steps_do_not_clobber_each_other(hass) -> None:
+    """Configuring Cloudflare Access must not wipe the allowlist, and
+    editing the allowlist afterwards must not wipe Cloudflare Access —
+    async_create_entry's data replaces entry.options wholesale, so each
+    step must merge with what's already there."""
+    entry = await _setup_entry(hass)
+    hass.states.async_set("lock.front_door", "locked", {})
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "entities"}
+    )
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {"entities": ["lock.front_door"], "control": []}
+    )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "cloudflare_access"}
+    )
+    await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_CF_ACCESS_TEAM_DOMAIN: "myteam", CONF_CF_ACCESS_AUD: "test-aud-tag"},
+    )
+    await hass.async_block_till_done()
+
+    # Cloudflare Access config didn't wipe the allowlist set moments earlier.
+    assert entry.options[CONF_ENTITIES] == [
+        {"entity_id": "lock.front_door", "read": True, "control": False}
+    ]
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "entities"}
+    )
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {"entities": ["lock.front_door"], "control": ["lock.front_door"]}
+    )
+    await hass.async_block_till_done()
+
+    # Editing the allowlist again didn't wipe the Cloudflare Access config.
+    assert entry.options[CONF_CF_ACCESS_TEAM_DOMAIN] == "myteam"
+    assert entry.options[CONF_CF_ACCESS_AUD] == "test-aud-tag"

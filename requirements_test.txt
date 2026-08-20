@@ -1,5 +1,6 @@
 pytest-homeassistant-custom-component==0.13.348
 mcp>=1.9.0,<2.0.0
+PyJWT[crypto]>=2.0.0
 
 # Pulled in only so tests can set up the official mcp_server integration
 # alongside this one, to prove FR-8 (no cross-integration interference).

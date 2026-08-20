@@ -20,7 +20,8 @@
         "title": "Concierge MCP options",
         "menu_options": {
           "entities": "Manage exposed entities",
-          "regenerate_secret": "Regenerate guest secret"
+          "regenerate_secret": "Regenerate guest secret",
+          "cloudflare_access": "Configure Cloudflare Access sign-in (optional)"
         }
       },
       "entities": {
@@ -34,6 +35,14 @@
       "regenerate_secret": {
         "title": "Regenerate guest secret",
         "description": "This immediately invalidates the old secret. Update your MCP client before confirming, or it will lose access.\n\n```\n{secret}\n```"
+      },
+      "cloudflare_access": {
+        "title": "Cloudflare Access sign-in (optional)",
+        "description": "Lets you (a human, signed in through Cloudflare Access) use this endpoint directly — for example to add it to Claude.ai for testing — separately from the guest secret used by your chatbot backend. Leave either field blank to disable this and accept only the guest secret.",
+        "data": {
+          "cf_access_team_domain": "Cloudflare Access team domain (e.g. myteam, without .cloudflareaccess.com)",
+          "cf_access_aud": "Access Application AUD tag"
+        }
       }
     }
   }

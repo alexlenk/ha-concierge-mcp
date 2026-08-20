@@ -6,9 +6,15 @@ validates the request against ``hass.auth`` (a Long-Lived Access Token,
 session cookie, or similar), and any of those would grant this endpoint
 the same blast radius as the rest of the Home Assistant API — exactly
 what this integration exists to avoid (see the design document, section
-3.2). Authentication here is performed exclusively by ``auth.verify_secret``
-against this integration's own guest secret. There is no other
-authentication path, no admin bypass, and no loopback exemption.
+3.2). There is no admin bypass and no loopback exemption.
+
+Two independent auth paths are accepted — either is sufficient:
+``auth.verify_secret`` (the guest secret, for the headless guest chatbot
+backend) or ``cloudflare_access.verify_jwt`` (a Cloudflare Access JWT, for
+a human operator testing interactively; inert unless explicitly
+configured). Neither path can weaken the other; both are checked
+independently against this integration's own state, never against
+``hass.auth``.
 """
 from __future__ import annotations
 
@@ -20,11 +26,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.http import KEY_HASS, HomeAssistantView
 
-from . import auth, mcp_protocol
+from . import auth, cloudflare_access, mcp_protocol
 from .const import (
     API_URL,
     DOMAIN,
     HEADER_AUTHORIZATION,
+    HEADER_CF_ACCESS_JWT,
     MCP_PROTOCOL_VERSION,
     MCP_SERVER_NAME,
     MCP_SERVER_VERSION,
@@ -56,7 +63,12 @@ class ConciergeMCPView(HomeAssistantView):
         if entry is None:
             return web.json_response({"error": "not_configured"}, status=503)
 
-        if not auth.verify_secret(entry, request.headers.get(HEADER_AUTHORIZATION)):
+        authenticated = auth.verify_secret(
+            entry, request.headers.get(HEADER_AUTHORIZATION)
+        ) or await cloudflare_access.verify_jwt(
+            hass, entry, request.headers.get(HEADER_CF_ACCESS_JWT)
+        )
+        if not authenticated:
             return web.json_response({"error": "unauthorized"}, status=401)
 
         try:

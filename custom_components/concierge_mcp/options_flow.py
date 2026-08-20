@@ -8,7 +8,15 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlowResult, OptionsF
 from homeassistant.helpers import selector
 
 from . import auth
-from .const import CONF_CONTROL, CONF_ENTITIES, CONF_ENTITY_ID, CONF_READ, CONF_SECRET
+from .const import (
+    CONF_CF_ACCESS_AUD,
+    CONF_CF_ACCESS_TEAM_DOMAIN,
+    CONF_CONTROL,
+    CONF_ENTITIES,
+    CONF_ENTITY_ID,
+    CONF_READ,
+    CONF_SECRET,
+)
 
 
 class ConciergeMCPOptionsFlow(OptionsFlow):
@@ -29,10 +37,11 @@ class ConciergeMCPOptionsFlow(OptionsFlow):
         self._new_secret: str | None = None
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Offer a choice between editing the allowlist and regenerating the secret."""
+        """Offer a choice between editing the allowlist, regenerating the
+        secret, or configuring the optional Cloudflare Access auth path."""
         return self.async_show_menu(
             step_id="init",
-            menu_options=["entities", "regenerate_secret"],
+            menu_options=["entities", "regenerate_secret", "cloudflare_access"],
         )
 
     async def async_step_entities(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -51,7 +60,12 @@ class ConciergeMCPOptionsFlow(OptionsFlow):
                 }
                 for entity_id in selected
             ]
-            return self.async_create_entry(data={CONF_ENTITIES: entities})
+            # async_create_entry's data *replaces* entry.options wholesale
+            # (it's not merged) — start from the current options so an
+            # allowlist edit doesn't silently wipe out the Cloudflare
+            # Access settings, or vice versa in the other steps below.
+            new_options = {**self.config_entry.options, CONF_ENTITIES: entities}
+            return self.async_create_entry(data=new_options)
 
         return self.async_show_form(
             step_id="entities",
@@ -86,4 +100,36 @@ class ConciergeMCPOptionsFlow(OptionsFlow):
             step_id="regenerate_secret",
             data_schema=vol.Schema({}),
             description_placeholders={"secret": self._new_secret},
+        )
+
+    async def async_step_cloudflare_access(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure (or clear) the optional Cloudflare Access JWT auth path.
+
+        Both fields must be non-empty for this path to activate — leaving
+        either blank disables it, restoring guest-secret-only behavior.
+        """
+        if user_input is not None:
+            new_options = {
+                **self.config_entry.options,
+                CONF_CF_ACCESS_TEAM_DOMAIN: user_input.get(CONF_CF_ACCESS_TEAM_DOMAIN, "").strip(),
+                CONF_CF_ACCESS_AUD: user_input.get(CONF_CF_ACCESS_AUD, "").strip(),
+            }
+            return self.async_create_entry(data=new_options)
+
+        return self.async_show_form(
+            step_id="cloudflare_access",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_CF_ACCESS_TEAM_DOMAIN,
+                        default=self.config_entry.options.get(CONF_CF_ACCESS_TEAM_DOMAIN, ""),
+                    ): str,
+                    vol.Optional(
+                        CONF_CF_ACCESS_AUD,
+                        default=self.config_entry.options.get(CONF_CF_ACCESS_AUD, ""),
+                    ): str,
+                }
+            ),
         )
