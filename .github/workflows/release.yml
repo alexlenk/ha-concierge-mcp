@@ -2,15 +2,23 @@ name: Release
 
 # Covers the two paths auto-tag.yml doesn't: a human manually pushing a
 # `vX.Y.Z` tag directly, and workflow_dispatch as a manual escape hatch
-# to (re-)publish the release for a tag that already exists (GITHUB_REF
-# comes from whichever ref the dispatch targets, so this works the same
-# way as the tag-push trigger below).
+# to (re-)publish the release for a tag that already exists.
+#
+# workflow_dispatch runs from a branch (GitHub reads the workflow
+# definition from whatever ref you pick to run it from — a tag cut
+# before this trigger existed won't offer it), so github.ref_name in
+# that case is the branch, not a release tag. The `tag` input is how you
+# tell this run which existing tag to actually check out and publish.
 
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish a release for, e.g. v0.1.0"
+        required: true
 
 jobs:
   release:
@@ -19,6 +27,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -35,14 +45,16 @@ jobs:
 
       - name: Validate manifest version matches tag
         run: |
-          tag_version="${GITHUB_REF_NAME#v}"
+          tag_name="${{ inputs.tag || github.ref_name }}"
+          tag_version="${tag_name#v}"
           manifest_version=$(python -c "import json; print(json.load(open('custom_components/concierge_mcp/manifest.json'))['version'])")
           if [ "$tag_version" != "$manifest_version" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match manifest.json version $manifest_version"
+            echo "Tag $tag_name does not match manifest.json version $manifest_version"
             exit 1
           fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           generate_release_notes: true
