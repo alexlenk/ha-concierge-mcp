@@ -11,5 +11,5 @@
   "issue_tracker": "https://github.com/alexlenk/ha-concierge-mcp/issues",
   "requirements": ["mcp>=1.9.0,<2.0.0", "PyJWT[crypto]>=2.0.0"],
   "single_config_entry": true,
-  "version": "0.1.0"
+  "version": "0.1.1"
 }

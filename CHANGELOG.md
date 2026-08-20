@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-20
+
+### Added
+
+- Real brand assets (`icon.png`, `icon@2x.png`, `logo.png`, `logo@2x.png`)
+  replacing the text-only placeholder icon, and a logo banner at the top
+  of the README.
+
 ## [0.1.0] - 2026-08-20
 
 ### Added
