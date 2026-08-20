@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-20
+
 ### Added
 
 - Initial implementation: `/api/concierge_mcp` MCP Streamable HTTP
@@ -16,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional second auth path for interactive use (e.g. testing via
   Claude.ai): a Cloudflare Access JWT, verified independently of the
   guest secret, off by default.
+- `get_history(entity_id, hours=24)` tool: recent state transitions for an
+  allowlisted entity, via Home Assistant's `recorder`. Same allowlist gate
+  as `get_state`; capped at 7 days of lookback (larger requests are
+  clamped, not rejected) and 100 returned transitions (oldest dropped
+  first), both reported back to the caller when hit. Fails with an
+  explicit `history_unavailable` error, not a crash, if `recorder` isn't
+  running.
 
 ### Fixed
 

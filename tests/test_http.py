@@ -117,7 +117,7 @@ async def test_tools_list_reflects_current_allowlist(hass, hass_client_no_auth) 
 
     body = await resp.json()
     tool_names = {t["name"] for t in body["result"]["tools"]}
-    assert tool_names == {"get_state", "list_entities"}
+    assert tool_names == {"get_state", "list_entities", "get_history"}
 
 
 async def test_tools_call_rejects_entity_outside_allowlist(hass, hass_client_no_auth) -> None:

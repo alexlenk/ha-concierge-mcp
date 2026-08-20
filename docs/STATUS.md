@@ -13,7 +13,20 @@ milestone's status changes; don't let it go stale.
   generation + one-time display), options flow (entity-picker allowlist +
   secret regeneration), the `ConciergeMCPView` HTTP endpoint at
   `/api/concierge_mcp` with its own `hmac.compare_digest` secret check,
-  `get_state`/`list_entities` MCP tools, diagnostics redaction.
+  `get_state`/`list_entities`/`get_history` MCP tools, diagnostics
+  redaction.
+- `get_history(entity_id, hours=24)`: recent state transitions for one
+  allowlisted entity via Home Assistant's `recorder` (`after_dependencies`,
+  not a hard dependency — an operator can legitimately run without it).
+  Same `CONF_READ` allowlist gate as `get_state`. Follows the same
+  tool-design guidance as the other two tools: a natural-language `hours`
+  duration instead of requiring the caller to compute ISO-8601
+  start/end timestamps; out-of-range `hours` is clamped (not rejected)
+  with the effective window reported back; results capped at 100
+  transitions (`MAX_HISTORY_STATES`), keeping the most recent when
+  truncating, with a truncation message mirroring `list_entities`'s.
+  Returns an explicit `history_unavailable` error rather than crashing if
+  `recorder` isn't set up.
 - Tool responses were checked against Anthropic's tool-design guidance
   (namespacing, high-signal responses, natural-language identifiers,
   truncation for large results): `get_state` strips low-signal HA

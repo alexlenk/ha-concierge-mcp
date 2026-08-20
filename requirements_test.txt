@@ -12,3 +12,11 @@ PyJWT[crypto]>=2.0.0
 aiohttp_sse
 hassil==3.8.0
 home-assistant-intents==2026.6.24
+
+# Pulled in so tests can exercise get_history against a real (in-memory)
+# recorder instance. Pinned to what recorder/manifest.json requires for
+# the homeassistant version above — same drift risk and review cadence as
+# the block above (design document, section 12.1).
+SQLAlchemy==2.0.51
+fnv-hash-fast==2.0.3
+psutil-home-assistant==0.0.1
