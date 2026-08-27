@@ -17,6 +17,6 @@ home-assistant-intents==2026.6.24
 # recorder instance. Pinned to what recorder/manifest.json requires for
 # the homeassistant version above — same drift risk and review cadence as
 # the block above (design document, section 12.1).
-SQLAlchemy==2.0.51
+SQLAlchemy==2.0.52
 fnv-hash-fast==2.0.3
 psutil-home-assistant==0.0.1
