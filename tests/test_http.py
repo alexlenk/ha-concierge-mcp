@@ -125,6 +125,45 @@ async def test_tools_list_reflects_current_allowlist(hass, hass_client_no_auth) 
     assert tool_names == {"get_state", "list_entities", "get_history"}
 
 
+async def test_tools_list_uses_mcp_spec_field_names(hass, hass_client_no_auth) -> None:
+    """Tool definitions must use the spec's camelCase ``inputSchema`` key.
+
+    Regression guard for issue #42: under ``mcp`` 2.x a plain
+    ``model_dump()`` emits snake_case ``input_schema``, which MCP clients
+    don't recognize.
+    """
+    await _setup_entry(hass)
+    client = await hass_client_no_auth()
+
+    resp = await client.post(
+        API_URL, json=_rpc("tools/list"), headers={"Authorization": "Bearer correct-secret"}
+    )
+
+    body = await resp.json()
+    for tool in body["result"]["tools"]:
+        assert tool["inputSchema"]["type"] == "object"
+        assert "input_schema" not in tool
+
+
+def test_to_wire_serializes_by_alias() -> None:
+    """``_to_wire`` must emit aliases, whatever the installed ``mcp`` major.
+
+    Uses a stand-in pydantic model shaped like ``mcp`` 2.x types (snake_case
+    field, camelCase alias), so this guard also fails under ``mcp`` 1.x if
+    ``by_alias`` is ever dropped.
+    """
+    from pydantic import BaseModel, ConfigDict, Field
+
+    from custom_components.concierge_mcp.http import _to_wire
+
+    class _Model(BaseModel):
+        model_config = ConfigDict(populate_by_name=True)
+        input_schema: dict = Field(alias="inputSchema")
+        description: str | None = None
+
+    assert _to_wire(_Model(inputSchema={"type": "object"})) == {"inputSchema": {"type": "object"}}
+
+
 async def test_tools_call_rejects_entity_outside_allowlist(hass, hass_client_no_auth) -> None:
     hass.states.async_set("lock.back_door", "locked", {})
     await _setup_entry(hass, entities=[])
