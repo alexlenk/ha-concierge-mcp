@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-22
+
+### Fixed
+
+- Setting up this integration no longer breaks Home Assistant's core
+  `mcp_server` on HA 2026.11+ (#42). The `mcp<2.0.0` requirement made HA
+  downgrade the `mcp==2.3.0` that core ships. The requirement is now
+  `mcp>=1.9.0` with no upper bound.
+- `tools/list` now emits the MCP-spec `inputSchema` field under `mcp` 2.x
+  as well (2.x serializes it as `input_schema` unless dumped by alias).
+
+### Changed
+
+- Test harness bumped to `pytest-homeassistant-custom-component==0.13.375`
+  (HA 2026.10.4), with test pins updated to match.
+
 ## [0.1.1] - 2026-08-20
 
 ### Added

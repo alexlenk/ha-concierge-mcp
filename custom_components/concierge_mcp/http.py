@@ -140,7 +140,7 @@ class ConciergeMCPView(HomeAssistantView):
         if method == "tools/list":
             tools = mcp_protocol.list_tools()
             return _jsonrpc_result(
-                request_id, {"tools": [t.model_dump(exclude_none=True) for t in tools]}
+                request_id, {"tools": [_to_wire(t) for t in tools]}
             )
 
         if method == "tools/call":
@@ -150,7 +150,7 @@ class ConciergeMCPView(HomeAssistantView):
             return _jsonrpc_result(
                 request_id,
                 {
-                    "content": [c.model_dump(exclude_none=True) for c in content],
+                    "content": [_to_wire(c) for c in content],
                     "isError": is_error,
                 },
             )
@@ -192,6 +192,17 @@ class ConciergeMCPView(HomeAssistantView):
             {"error": "method_not_allowed", "message": "This endpoint is stateless; no session to delete"},
             status=405,
         )
+
+
+def _to_wire(model: Any) -> dict[str, Any]:
+    """Serialize an ``mcp.types`` model to its MCP wire (camelCase) form.
+
+    ``by_alias=True`` is required: since ``mcp`` 2.x the Python field names
+    are snake_case (``input_schema``) with the spec's camelCase names
+    (``inputSchema``) only as aliases. Under 1.x both are the same, so this
+    is correct for either major version.
+    """
+    return model.model_dump(by_alias=True, exclude_none=True)
 
 
 def _jsonrpc_result(request_id: Any, result: dict[str, Any]) -> web.Response:

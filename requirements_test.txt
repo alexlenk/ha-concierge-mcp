@@ -1,5 +1,9 @@
-pytest-homeassistant-custom-component==0.13.348
-mcp>=1.9.0,<2.0.0
+pytest-homeassistant-custom-component==0.13.375
+# The integration itself only requires mcp>=1.9.0 (see manifest.json; it must
+# never cap or downgrade the mcp that HA core's mcp_server owns, issue #42).
+# Tests pin the exact version HA's mcp_server/manifest.json requires for the
+# homeassistant version below, because the tests set up that integration too.
+mcp==1.28.1
 PyJWT[crypto]>=2.0.0
 
 # Pulled in only so tests can set up the official mcp_server integration
@@ -8,15 +12,16 @@ PyJWT[crypto]>=2.0.0
 # pins for the homeassistant version pytest-homeassistant-custom-component
 # above resolves to — check that manifest during each upstream sync review
 # (design document, section 12.1) rather than assuming these stay correct.
-# Pinned to HA 2026.7.4's conversation/manifest.json (0.13.348 -> homeassistant==2026.7.4).
+# Pinned to HA 2026.10.4's conversation/manifest.json (0.13.375 -> homeassistant==2026.10.4).
 aiohttp_sse
-hassil==3.8.0
-home-assistant-intents==2026.6.24
+gazetteer-matcher==1.1.0
+hassil==3.12.1
+home-assistant-intents==2026.10.6
 
 # Pulled in so tests can exercise get_history against a real (in-memory)
 # recorder instance. Pinned to what recorder/manifest.json requires for
 # the homeassistant version above — same drift risk and review cadence as
 # the block above (design document, section 12.1).
-SQLAlchemy==2.0.51
+SQLAlchemy==2.0.54
 fnv-hash-fast==2.0.3
 psutil-home-assistant==0.0.1

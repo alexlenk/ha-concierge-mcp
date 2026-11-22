@@ -257,7 +257,7 @@ Mirror upstream's shape but as an independent domain:
   "issue_tracker": "https://github.com/alexlenk/ha-concierge-mcp/issues",
   "integration_type": "service",
   "iot_class": "local_push",
-  "requirements": ["mcp==<pin, see §13>"],
+  "requirements": ["mcp>=<floor, see §13>"],
   "single_config_entry": false,
   "version": "0.1.0"
 }
@@ -504,15 +504,23 @@ don't feel obligated to keep maintaining it past the point where the
 platform gap it fills has closed.
 ---
 ## 13. Dependency Management Strategy
-- Pin `mcp`, `aiohttp_sse`, and `anyio` in `manifest.json`'s
-  `requirements` to versions **compatible with** whatever the
-  currently-targeted upstream HA release itself pins in
-  `homeassistant/components/mcp_server/manifest.json`. These run in the
-  same Python environment as HA core — installing an incompatible `mcp`
-  SDK version risks conflicting with what HA core's own `mcp_server`
-  integration (if also installed, which is expected — see FR-8) requires.
-  Check this pin explicitly during each upstream sync review (§12.1), not
-  just once at initial implementation.
+- `manifest.json` declares `mcp` with a **floor only** (`mcp>=1.9.0`), no
+  upper bound and no exact pin. The package runs in the same Python
+  environment as HA core, which owns it via its own `mcp_server`/`mcp`
+  integrations (expected to be installed alongside, see FR-8). Any
+  requirement that excludes HA core's version makes HA reinstall a
+  different `mcp` over it and breaks core `mcp_server`. That happened with
+  `mcp<2.0.0` once HA 2026.11 moved to `mcp==2.3.0` (issue #42). This
+  integration must therefore work with whatever `mcp` major HA core ships:
+  it only uses `mcp.types.Tool` / `TextContent`, always serialized with
+  `model_dump(by_alias=True, ...)` so the MCP wire names (`inputSchema`)
+  come out right under both 1.x and 2.x. Check compatibility with HA's
+  current `mcp_server/manifest.json` pin during each upstream sync review
+  (§12.1), not just once at initial implementation.
+- `requirements_test.txt` is different: it pins `mcp` (and `aiohttp_sse`,
+  the `conversation` and `recorder` requirements) **exactly** to what the
+  HA version under test requires, because the tests set up HA's own
+  `mcp_server` too.
 - Dependabot (§11) proposes updates automatically; each bump must pass the
   full `test.yml` matrix before merging, specifically including the
   cross-integration isolation test (§10) — a `mcp` SDK bump is exactly the
