@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Test harness bumped to `pytest-homeassistant-custom-component==0.13.375`
   (HA 2026.10.4), with test pins updated to match.
+- `PyJWT[crypto]` is no longer listed in `manifest.json` requirements (#43).
+  Home Assistant itself depends on PyJWT and `cryptography`, and hassfest
+  rejects custom integrations that re-list core dependencies.
 
 ## [0.1.1] - 2026-08-20
 
