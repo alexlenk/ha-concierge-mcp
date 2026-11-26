@@ -18,7 +18,7 @@ PyJWT[crypto]>=2.0.0
 aiohttp_sse
 gazetteer-matcher==1.1.0
 hassil==3.12.1
-home-assistant-intents==2026.10.6
+home-assistant-intents==2026.10.27
 
 # Pulled in so tests can exercise get_history against a real (in-memory)
 # recorder instance. Pinned to what recorder/manifest.json requires for
