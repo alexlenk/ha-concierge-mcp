@@ -6,7 +6,7 @@ pytest-homeassistant-custom-component==0.13.375
 mcp==1.28.1
 # PyJWT and cryptography come with homeassistant itself (its pyproject.toml
 # dependencies), which is why manifest.json must not list them (issue #43).
-PyJWT[crypto]>=2.0.0
+PyJWT[crypto]>=2.15.1
 
 # Pulled in only so tests can set up the official mcp_server integration
 # alongside this one, to prove FR-8 (no cross-integration interference).
