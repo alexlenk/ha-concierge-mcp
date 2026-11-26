@@ -16,7 +16,7 @@ PyJWT[crypto]>=2.0.0
 # (design document, section 12.1) rather than assuming these stay correct.
 # Pinned to HA 2026.10.4's conversation/manifest.json (0.13.375 -> homeassistant==2026.10.4).
 aiohttp_sse
-gazetteer-matcher==1.1.0
+gazetteer-matcher==1.2.0
 hassil==3.12.1
 home-assistant-intents==2026.10.6
 
