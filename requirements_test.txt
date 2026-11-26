@@ -3,7 +3,7 @@ pytest-homeassistant-custom-component==0.13.375
 # never cap or downgrade the mcp that HA core's mcp_server owns, issue #42).
 # Tests pin the exact version HA's mcp_server/manifest.json requires for the
 # homeassistant version below, because the tests set up that integration too.
-mcp==1.28.1
+mcp==2.3.0
 # PyJWT and cryptography come with homeassistant itself (its pyproject.toml
 # dependencies), which is why manifest.json must not list them (issue #43).
 PyJWT[crypto]>=2.0.0
